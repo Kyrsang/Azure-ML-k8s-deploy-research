@@ -1,0 +1,6 @@
+$schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
+name: endpoint-eunsang-k8s
+auth_mode: key
+compute: azureml:k8s-compute
+identity:
+  type: system_assigned

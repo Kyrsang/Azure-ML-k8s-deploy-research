@@ -1,0 +1,10 @@
+$schema: https://azuremlschemas.azureedge.net/latest/schedule.schema.json
+name: cron_scheduling_job
+display_name: Cron Scheduling Job
+description: A cron job to schedule a pipeline job
+
+trigger:
+  type: cron
+  expression: "0 */2 * * *"   # every 2 hours
+  
+create_job: ./scheduled_pipeline_job_k8s.yml

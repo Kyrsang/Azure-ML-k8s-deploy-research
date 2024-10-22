@@ -1,0 +1,9 @@
+paths:
+- file: ./iris.csv 
+transformations:
+- read_delimited:
+    delimiter: ','
+    empty_as_string: false
+    encoding: utf8
+    header: all_files_same_headers
+type: mltable

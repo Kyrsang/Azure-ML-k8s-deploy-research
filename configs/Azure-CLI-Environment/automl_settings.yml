@@ -1,0 +1,28 @@
+$schema: https://azuremlschemas.azureedge.net/latest/autoMLJob.schema.json
+type: automl
+
+experiment_name: Default
+description: A classification AutoML job
+display_name: eunsang_automl_job
+
+task: classification
+
+training_data:
+  path: "azureml:iris-dataset:1"
+  type: mltable
+
+compute: azureml:eunsang-ml-research
+
+primary_metric: accuracy
+target_column_name: y
+n_cross_validations: 5
+
+limits:
+  timeout_minutes: 600
+  trial_timeout_minutes: 20
+  max_trials: 5
+  enable_early_termination: True
+
+training:
+  blocked_training_algorithms: ["logistic_regression"]
+  enable_onnx_compatible_models: True

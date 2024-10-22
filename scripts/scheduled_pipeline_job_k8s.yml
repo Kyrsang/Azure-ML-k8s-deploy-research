@@ -1,0 +1,171 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+display_name: scheduled_pipeline
+compute: azureml:eunsang-ml-research
+
+# settings: 
+#   force_rerun: True   # for production 
+
+jobs:
+  prepare_dataset:
+    command: |
+      # Create dataset and extract path
+      DATA_OUTPUT=$(az ml data create --name iris-dataset \
+        --path /app/datasets \
+        --type mltable \
+        --workspace-name inbrein-azure-ml-research-eunsang \
+        --resource-group inbrein-azure-ml-research \
+        --query "path" -o tsv)
+
+      # Save the path to an output file
+      echo $DATA_OUTPUT > ${{outputs.dataset_path}}/dataset_path.txt
+
+    environment:
+      image: eunsangacr.azurecr.io/azureml-with-azcli:latest
+    outputs:
+      dataset_path:
+  
+  setup_automl:
+    command: |
+      # Read the dataset path from the input file
+      DATA_PATH=$(cat ${{inputs.dataset_path}}/dataset_path.txt)
+
+      # Create automl job using the dataset path and capture job name
+      JOB_NAME=$(az ml job create --file /app/configs/automl_settings.yml \
+        --set training_data.path=${DATA_PATH} \
+        --workspace-name inbrein-azure-ml-research-eunsang \
+        --resource-group inbrein-azure-ml-research \
+        --query "name" -o tsv)
+
+      # Save the job name to an output file
+      echo $JOB_NAME > ${{outputs.automl_job_name}}/job_name.txt
+  
+    environment:
+      image: eunsangacr.azurecr.io/azureml-with-azcli:latest  
+    inputs:
+      dataset_path: ${{parent.jobs.prepare_dataset.outputs.dataset_path}}
+    outputs:
+      automl_job_name:
+
+  monitor_automl:
+    command: |
+      # Read the AutoML job name from the input file
+      JOB_NAME=$(cat ${{inputs.automl_job_name}}/job_name.txt)
+
+      # Initialize job status
+      JOB_OUTPUT=""
+
+      # Loop until the job is completed
+      while true; do
+        # Check the job status
+        JOB_OUTPUT=$(az ml job show --name $JOB_NAME \
+          --workspace-name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research 2>&1)
+
+        # Check if the job status contains 'Completed'
+        if echo "$JOB_OUTPUT" | grep -q "Completed"; then
+          echo "Job status: Completed. Exiting loop..."
+          break
+        else
+          echo "Job status: Not completed yet. Waiting for 30 seconds before checking again..."
+          sleep 30  # Sleep for 30 seconds
+        fi
+      done
+
+      # Save the job name again for the next step
+      echo $JOB_NAME > ${{outputs.monitored_job_name}}/job_name.txt
+      
+    environment:
+      image: eunsangacr.azurecr.io/azureml-with-azcli:latest
+    inputs:
+      automl_job_name: ${{parent.jobs.setup_automl.outputs.automl_job_name}}
+    outputs:
+      monitored_job_name:
+
+  create_endpoint:
+    command: | 
+      # Register resource providers for subscription 
+      az provider register --namespace Microsoft.MachineLearningServices
+      az provider register --namespace Microsoft.PolicyInsights
+
+      # Define the endpoint name
+      ENDPOINT_NAME="endpoint-eunsang-k8s"
+      
+      # Check if the endpoint already exists by capturing the exit code
+      az ml online-endpoint show --name $ENDPOINT_NAME \
+        --workspace-name inbrein-azure-ml-research-eunsang \
+        --resource-group inbrein-azure-ml-research > /dev/null 2>&1
+        
+      if [ $? -eq 0 ]; then
+        echo "Endpoint $ENDPOINT_NAME already exists. Updating existing endpoint."
+        az ml online-endpoint update \
+          -n $ENDPOINT_NAME \
+          -f /app/configs/automl_endpoint_k8s_settings.yml \
+          --workspace-name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research
+      else
+        echo "Endpoint $ENDPOINT_NAME does not exist. Creating new endpoint."
+        az ml online-endpoint create \
+          -f /app/configs/automl_endpoint_k8s_settings.yml \
+          --workspace-name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research
+      fi
+
+      # Dummy output to ensure this job completes before the next
+      echo "Endpoint operation completed" > ${{outputs.endpoint_trigger}}/endpoint_trigger.txt
+  
+    environment:
+      image: eunsangacr.azurecr.io/azureml-with-azcli:latest
+    outputs:
+      endpoint_trigger:
+  
+  deploy_best_model:
+    command: | 
+      
+      # Sync keys for dependent resources (TrackingID#2410180030000685 - [방법1])
+      az ml workspace sync-keys \
+        --resource-group inbrein-azure-ml-research \
+        --name inbrein-azure-ml-research-eunsang
+        
+      # Wait for the endpoint creation/update to complete
+      echo "Received trigger: $(cat ${{inputs.endpoint_trigger}}/endpoint_trigger.txt)"
+
+      # Download the model artifact to the specified directory
+      az ml job download --name $(cat ${{inputs.monitored_job_name}}/job_name.txt) \
+        --all --download-path /app/configs/downloaded_artifacts \
+        --workspace-name inbrein-azure-ml-research-eunsang \
+        --resource-group inbrein-azure-ml-research
+
+      # Define the deployment name
+      DEPLOYMENT_NAME="model-deployment-eunsang"
+      ENDPOINT_NAME="endpoint-eunsang-k8s"
+
+      # Check if the deployment already exists
+      az ml online-deployment show --endpoint-name $ENDPOINT_NAME \
+        --name $DEPLOYMENT_NAME \
+        --workspace-name inbrein-azure-ml-research-eunsang \
+        --resource-group inbrein-azure-ml-research > /dev/null 2>&1
+
+      if [ $? -eq 0 ]; then
+        echo "Deployment $DEPLOYMENT_NAME already exists. Updating the existing deployment."
+        az ml online-deployment update \
+          --name $DEPLOYMENT_NAME \
+          --endpoint-name $ENDPOINT_NAME \
+          --file /app/configs/automl_deployment_k8s_settings.yml \
+          --workspace-name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research
+      else
+        echo "Deployment $DEPLOYMENT_NAME does not exist. Creating a new deployment."
+        az ml online-deployment create \
+          --name $DEPLOYMENT_NAME \
+          --endpoint-name $ENDPOINT_NAME \
+          --file /app/configs/automl_deployment_k8s_settings.yml \
+          --workspace-name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research
+      fi
+      
+    environment:
+      image: eunsangacr.azurecr.io/azureml-with-azcli:latest
+    inputs:
+      monitored_job_name: ${{parent.jobs.monitor_automl.outputs.monitored_job_name}}
+      endpoint_trigger: ${{parent.jobs.create_endpoint.outputs.endpoint_trigger}}

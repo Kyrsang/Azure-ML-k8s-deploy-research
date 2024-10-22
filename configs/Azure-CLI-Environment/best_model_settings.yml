@@ -1,0 +1,4 @@
+$schema: https://azuremlschemas.azureedge.net/latest/model.schema.json
+name: trained-automl-best-model
+path: ./downloaded_artifacts/named-outputs/best_model/model.pkl
+description: Register a trained automl best model 

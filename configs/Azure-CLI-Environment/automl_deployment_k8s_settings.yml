@@ -1,0 +1,21 @@
+$schema: https://azuremlschemas.azureedge.net/latest/kubernetesOnlineDeployment.schema.json
+
+type: kubernetes 
+app_insights_enabled: true
+
+name: deployment-eunsang-k8s
+endpoint_name: endpoint-eunsang-k8s
+
+model:
+  path: ./downloaded_artifacts/named-outputs/best_model/
+
+code_configuration:
+  code: ./
+  scoring_script: score.py
+
+environment: 
+  conda_file: ./downloaded_artifacts/named-outputs/best_model/conda.yaml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:latest
+
+instance_type: defaultinstancetype # Specify a custom InstanceType CRD name here if needed     
+instance_count: 1

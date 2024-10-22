@@ -1,0 +1,105 @@
+name: Create Azure ML Scheduling K8S Deployment Infra   
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare-and-push-docker-environment:   
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.1.7
+
+    - name: Log in to Azure CLI
+      uses: azure/login@v2.1.0
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Log in to Azure Container Registry
+      run: |
+        az acr login --name eunsangacr
+
+    - name: Build Docker image
+      run: |
+        docker build \
+          --build-arg AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }} \
+          --build-arg AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }} \
+          --build-arg AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }} \
+          --build-arg AZURE_SUBSCRIPTION_ID=${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+          -t eunsangacr.azurecr.io/azureml-with-azcli:latest \
+          -f ./configs/Azure-CLI-Environment/Dockerfile ./configs/Azure-CLI-Environment
+          
+    - name: Push Docker image to ACR
+      run: |
+        docker push eunsangacr.azurecr.io/azureml-with-azcli:latest
+
+    - name: Log out from Azure CLI
+      run: az logout
+
+  create-compute-cluster: 
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.1.7
+
+    - name: Log in to Azure CLI
+      uses: azure/login@v2.1.0
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Install Azure ML CLI extension
+      run: |
+        az extension add -n ml
+        az ml -h 
+
+    - name: Sync keys for dependent resources
+      run: |
+        az ml workspace sync-keys \
+        --resource-group inbrein-azure-ml-research \
+        --name inbrein-azure-ml-research-eunsang
+
+    - name: Configure workspace permission to use managed identity
+      run: |
+        # Get the ACR instance name
+        acr_instance_name=$(az ml workspace show \
+          --name inbrein-azure-ml-research-eunsang \
+          --resource-group inbrein-azure-ml-research \
+          --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+          --query container_registry \
+          -o tsv)
+          
+        # Disable admin user to use managed identity
+        az acr update --name $(basename $acr_instance_name) --admin-enabled false    
+    
+    - name: Create Azure ML Compute Cluster 
+      run: | 
+        az ml compute create --file ./scripts/create_compute_cluster.yml \
+        --resource-group inbrein-azure-ml-research \
+        --workspace-name inbrein-azure-ml-research-eunsang
+
+  create-schedule:
+    runs-on: ubuntu-latest
+    needs: [prepare-and-push-docker-environment, create-compute-cluster]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4.1.7
+
+    - name: Log in to Azure CLI
+      uses: azure/login@v2.1.0
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Install Azure ML CLI extension
+      run: |
+        az extension add -n ml
+        az ml -h 
+        
+    - name: Create Azure ML Schedule
+      run: |
+        az ml schedule create --file ./scripts/scheduling_job_k8s.yml \
+        --resource-group inbrein-azure-ml-research \
+        --workspace-name inbrein-azure-ml-research-eunsang
+          
+    - name: Log out from Azure CLI
+      run: az logout
