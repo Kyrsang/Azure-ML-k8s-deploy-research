@@ -133,7 +133,7 @@
 		allowInsecureConnections=True `
 		InferenceRouterHA=False 
   ```
-  > 위 커맨드에서 사용된 옵션(config 이하 `enableTraining`, `enableInference` 등)은 테스팅 환경을 위한 최소한의 기본 옵션입니다. 프로덕션 환경에 맞는 세부 옵션 설정을 위해서는 [문서](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-deploy-kubernetes-extension?view=azureml-api-2&tabs=deploy-extension-with-cli#azure-machine-learning-extension-deployment---cli-examples-and-azure-portal)를 참고해주세요. 
+  > 위 커맨드에서 사용된 옵션(config 이하 `enableTraining`, `enableInference` 등)은 테스팅 환경을 위한 최소한의 기본 옵션입니다. 프로덕션 환경에 맞는 세부 옵션 설정을 위해서는 [문서](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-deploy-kubernetes-extension?view=azureml-api-2&tabs=deploy-extension-with-cli#review-azure-machine-learning-extension-configuration-settings)를 참고해주세요. 
 
 - 클러스터에 Azure Machine Learning 익스텐션이 올바르게 설치되었는지 확인합니다. 
   ```powershell
