@@ -188,7 +188,7 @@
 
 #### `create_endpoint` 스텝
    
-: 온라인 엔드포인트를 생성하는 커맨드 `az ml online-endpoint { update | creaete }`에 사용되는 설정 파일 [automl_endpoint_k8s_settings.yml](https://github.com/Kyrsang/Azure-ML-k8s-deploy-research/blob/main/configs/Azure-CLI-Environment/automl_endpoint_k8s_settings.yml) 내용이 변경되었습니다. 아래는 해당 파일 상세 내용입니다.
+: 온라인 엔드포인트를 생성하는 커맨드 `az ml online-endpoint { update | creaete }`에 사용되는 [설정 파일](https://github.com/Kyrsang/Azure-ML-k8s-deploy-research/blob/main/configs/Azure-CLI-Environment/automl_endpoint_k8s_settings.yml) 내용이 변경되었습니다. 아래는 해당 파일 상세 내용입니다.
  
 ```yaml
 $schema: https://azuremlschemas.azureedge.net/latest/managedOnlineEndpoint.schema.json
@@ -202,7 +202,7 @@ type: system_assigned
   
 #### `deploy_best_model` 스텝
    
-: 온라인 엔드포인트를 배포하는 커맨드 `az ml online-deployment updat { update | create }`에 사용되는 설정 파일 [automl_deployment_k8s_settings.yml](https://github.com/Kyrsang/Azure-ML-k8s-deploy-research/blob/main/configs/Azure-CLI-Environment/automl_deployment_k8s_settings.yml) 내용이 변경되었습니다. 아래는 해당 파일 상세 내용입니다.
+: 온라인 엔드포인트를 배포하는 커맨드 `az ml online-deployment updat { update | create }`에 사용되는 [설정 파일](https://github.com/Kyrsang/Azure-ML-k8s-deploy-research/blob/main/configs/Azure-CLI-Environment/automl_deployment_k8s_settings.yml) 내용이 변경되었습니다. 아래는 해당 파일 상세 내용입니다.
 
 ```yaml
 $schema: https://azuremlschemas.azureedge.net/latest/kubernetesOnlineDeployment.schema.json
