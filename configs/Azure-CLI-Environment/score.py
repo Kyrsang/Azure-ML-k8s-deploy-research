@@ -3,6 +3,9 @@ import logging
 import json
 import numpy
 import joblib
+import pandas as pd
+
+COLUMN_NAMES = ["sepal_length", "sepal_width", "petal_length", "petal_width"]
 
 def init():
     """
@@ -25,8 +28,11 @@ def run(raw_data):
     method and return the result back
     """
     logging.info("model 1: request received")
+    
     data = json.loads(raw_data)["data"]
-    data = numpy.array(data)
-    result = model.predict(data)
+    data_df = pd.DataFrame(data, columns=COLUMN_NAMES)  # Fix: "code": "UserError", "message": "Expected column(s) 0 not found in fitted data.",
+    
+    result = model.predict(data_df)
+    
     logging.info("Request processed")
     return result.tolist()
